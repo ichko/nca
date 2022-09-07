@@ -2,5 +2,7 @@
     "python.formatting.provider": "black",
     "cSpell.words": [
         "Conv"
-    ]
+    ],
+    "esbonio.sphinx.confDir": "",
+    "restructuredtext.preview.docutils.disabled": true
 }

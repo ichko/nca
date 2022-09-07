@@ -116,7 +116,7 @@ def main():
 
     steps = 32
     epochs = 1000
-    DEVICE = "cpu"
+    DEVICE = "cuda"
     nca = NCA(num_channels=1).to(DEVICE)
     decoder = Decoder(from_shape=[1, 32, 32], latent_size=16)
     optim = torch.optim.Adam([*nca.parameters(), *decoder.parameters()])

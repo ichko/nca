@@ -1,1 +1,4 @@
-__pycache__
+__pycache__vim
+*.ignore.*
+**/.ipynb_checkpoints/*
+**/__pycache__/*
