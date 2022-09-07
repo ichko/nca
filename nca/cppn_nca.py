@@ -14,11 +14,12 @@ class NCA(nn.Module):
             nn.Conv2d(
                 in_channels=1,
                 out_channels=64,
-                kernel_size=3,
+                kernel_size=7,
                 stride=1,
-                padding=1,
+                padding=3,
+                bias=False,
             ),
-            nn.ReLU(),
+            nn.Sigmoid(),
             nn.Conv2d(
                 in_channels=64,
                 out_channels=64,
@@ -26,7 +27,7 @@ class NCA(nn.Module):
                 stride=1,
                 padding=0,
             ),
-            nn.ReLU(),
+            nn.Sigmoid(),
             nn.Conv2d(
                 in_channels=64,
                 out_channels=64,
@@ -34,45 +35,51 @@ class NCA(nn.Module):
                 stride=1,
                 padding=0,
             ),
-            nn.ReLU(),
+            nn.Sigmoid(),
             nn.Conv2d(
                 in_channels=64,
-                out_channels=1,
+                out_channels=2,
                 kernel_size=1,
                 stride=1,
                 padding=0,
             ),
-            nn.Tanh(),
         )
 
     def forward(self, x, steps):
         seq = [x]
         for _ in range(steps):
-            x = x + self.net(x)
+            out = self.net(x)
+            new_x = x + F.tanh(out[:, :1])
+            lerp = torch.sigmoid(out[:, 1:])
+            x = lerp * new_x + (1 - lerp) * x
             seq.append(x)
 
         return torch.stack(seq, dim=1)
 
 
 if __name__ == "__main__":
-    model = NCA()
+    seq_len = 60
 
-    inp = torch.rand(16, 1, 32, 32)
-    seq = model.forward(inp, steps=60)
-    seq = seq.detach().cpu().numpy()
-    seq = seq[:, :, 0]
-    cmap = cm.get_cmap("viridis")
-    seq = cmap(seq)[..., :3]
-    bs, seq_len, h, w, c = seq.shape
-    seq = torch.tensor(seq).permute(0, 1, 4, 2, 3)
+    multi_seqs = []
+    for i in range(64):
+        model = NCA()
 
-    grid_seq = []
+        inp = torch.rand(1, 1, 32, 32)
+        seq = model.forward(inp, steps=seq_len)
+        seq = seq.detach().cpu().numpy()
+        seq = seq[:, :, 0]
+        cmap = cm.get_cmap("viridis")
+        seq = cmap(seq)[..., :3]
+        bs, _seq_len, h, w, c = seq.shape
+        seq = torch.tensor(seq).permute(0, 1, 4, 2, 3)
 
-    with utils.VideoWriter(filename="vid.ignore.mp4", fps=10) as vid:
+        multi_seqs.append(seq[0])
+    multi_seqs = torch.stack(multi_seqs, dim=0)
+
+    with utils.VideoWriter(filename="vid.ignore.mp4", fps=5) as vid:
         for i in range(seq_len):
-            frame_batch = seq[:, i]
-            frame_batch = torchvision.utils.make_grid(frame_batch, padding=2, nrow=4)
+            frame_batch = multi_seqs[:, i]
+            frame_batch = torchvision.utils.make_grid(frame_batch, padding=2, nrow=8)
             frame_batch = frame_batch.permute(1, 2, 0)
-            grid_seq.append(frame_batch)
 
-            vid.add(utils.zoom(frame_batch, scale=5))
+            vid.add(utils.zoom(frame_batch, scale=3))
