@@ -5,6 +5,7 @@ import torchvision
 from matplotlib import cm
 import matplotlib.pyplot as plt
 import utils
+from tqdm import tqdm
 
 
 class NCA(nn.Module):
@@ -22,22 +23,26 @@ class NCA(nn.Module):
             nn.ReLU6(),
             nn.Conv2d(
                 in_channels=1,
-                out_channels=5,
+                out_channels=32,
                 kernel_size=1,
                 stride=1,
                 padding=0,
             ),
             nn.ReLU6(),
             nn.Conv2d(
-                in_channels=5,
+                in_channels=32,
                 out_channels=2,
                 kernel_size=1,
                 stride=1,
                 padding=0,
             ),
         )
-        nn.init.uniform_(self.net[0].weight)
-        nn.init.zeros_(self.net[0].weight[:, :, 5:10, 5:10])
+        for p in self.parameters():
+            nn.init.normal_(p)
+
+        nn.init.ones_(self.net[0].weight)
+        self.net[0].weight.data *= -1
+        nn.init.ones_(self.net[0].weight[:, :, 5:10, 5:10])
 
     def forward(self, x, steps):
         seq = [x]
@@ -55,10 +60,10 @@ if __name__ == "__main__":
     seq_len = 60
 
     multi_seqs = []
-    for i in range(49):
+    for i in tqdm(range(16)):
         model = NCA()
 
-        inp = torch.rand(1, 1, 64, 64)
+        inp = torch.randn(1, 1, 64, 64)
         seq = model.forward(inp, steps=seq_len)
         seq = seq.detach().cpu().numpy()
         seq = seq[:, :, 0]
