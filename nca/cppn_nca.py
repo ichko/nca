@@ -20,7 +20,7 @@ class NCA(nn.Module):
                 padding=7,
                 bias=False,
             ),
-            nn.ReLU6(),
+            nn.ReLU(),
             nn.Conv2d(
                 in_channels=1,
                 out_channels=32,
@@ -28,19 +28,20 @@ class NCA(nn.Module):
                 stride=1,
                 padding=0,
             ),
-            nn.ReLU6(),
+            nn.ReLU(),
             nn.Conv2d(
                 in_channels=32,
-                out_channels=2,
+                out_channels=1,
                 kernel_size=1,
                 stride=1,
                 padding=0,
+                bias=False,
             ),
         )
         for p in self.parameters():
             nn.init.normal_(p)
 
-        nn.init.ones_(self.net[0].weight)
+        nn.init.zeros_(self.net[0].weight)
         self.net[0].weight.data *= -1
         nn.init.ones_(self.net[0].weight[:, :, 5:10, 5:10])
 
@@ -48,9 +49,7 @@ class NCA(nn.Module):
         seq = [x]
         for _ in range(steps):
             out = self.net(x)
-            new_x = x + F.tanh(out[:, :1])
-            lerp = torch.sigmoid(out[:, 1:])
-            x = lerp * new_x + (1 - lerp) * x
+            x = out
             seq.append(x)
 
         return torch.stack(seq, dim=1)
@@ -60,10 +59,12 @@ if __name__ == "__main__":
     seq_len = 60
 
     multi_seqs = []
-    for i in tqdm(range(16)):
+    for i in tqdm(range(49)):
         model = NCA()
 
-        inp = torch.randn(1, 1, 64, 64)
+        inp = torch.zeros(1, 1, 64, 64)
+        nn.init.normal_(inp[0, 0, 20:40, 20:40])
+
         seq = model.forward(inp, steps=seq_len)
         seq = seq.detach().cpu().numpy()
         seq = seq[:, :, 0]
