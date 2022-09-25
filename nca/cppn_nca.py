@@ -14,23 +14,25 @@ class NCA(nn.Module):
         self.net = nn.Sequential(
             nn.Conv2d(
                 in_channels=1,
-                out_channels=1,
-                kernel_size=15,
+                out_channels=3,
+                kernel_size=5,
                 stride=1,
-                padding=7,
+                padding=2,
+                padding_mode="circular",
                 bias=False,
             ),
             nn.ReLU(),
             nn.Conv2d(
-                in_channels=1,
-                out_channels=32,
+                in_channels=3,
+                out_channels=10,
                 kernel_size=1,
                 stride=1,
                 padding=0,
+                bias=False,
             ),
             nn.ReLU(),
             nn.Conv2d(
-                in_channels=32,
+                in_channels=10,
                 out_channels=1,
                 kernel_size=1,
                 stride=1,
@@ -39,36 +41,40 @@ class NCA(nn.Module):
             ),
         )
         for p in self.parameters():
-            nn.init.normal_(p)
-
-        nn.init.zeros_(self.net[0].weight)
-        self.net[0].weight.data *= -1
-        nn.init.ones_(self.net[0].weight[:, :, 5:10, 5:10])
+            nn.init.normal_(p, 0, 0.8)
 
     def forward(self, x, steps):
         seq = [x]
         for _ in range(steps):
-            out = self.net(x)
-            x = out
+            x = torch.sigmoid(x + self.net(x))
             seq.append(x)
 
         return torch.stack(seq, dim=1)
+
+
+class NCASim(nn.Module):
+    def __init__(self, in_size) -> None:
+        super().__init__()
+        self.ca = NCA()
+        self.expand = nn.Sequential(nn.Linear())
 
 
 if __name__ == "__main__":
     seq_len = 60
 
     multi_seqs = []
+    inp = torch.zeros(1, 1, 64, 64)
+    nn.init.uniform_(inp[0, 0, 20:40, 20:40])
+    inp = (inp > 0.9).float()
+    cmap = cm.get_cmap("viridis")
+
     for i in tqdm(range(49)):
         model = NCA()
 
-        inp = torch.zeros(1, 1, 64, 64)
-        nn.init.normal_(inp[0, 0, 20:40, 20:40])
-
         seq = model.forward(inp, steps=seq_len)
         seq = seq.detach().cpu().numpy()
-        seq = seq[:, :, 0]
-        cmap = cm.get_cmap("viridis")
+        mi, ma = seq.min(), seq.max()
+        seq = (seq[:, :, 0] - mi) / (ma - mi)
         seq = cmap(seq)[..., :3]
         bs, _seq_len, h, w, c = seq.shape
         seq = torch.tensor(seq).permute(0, 1, 4, 2, 3)
