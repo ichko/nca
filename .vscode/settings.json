@@ -1,8 +1,11 @@
 {
-    "python.formatting.provider": "black",
+    "python.formatting.provider": "none",
     "cSpell.words": [
         "Conv"
     ],
     "esbonio.sphinx.confDir": "",
-    "restructuredtext.preview.docutils.disabled": true
+    "restructuredtext.preview.docutils.disabled": true,
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    }
 }

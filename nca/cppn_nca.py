@@ -14,16 +14,16 @@ class NCA(nn.Module):
         self.net = nn.Sequential(
             nn.Conv2d(
                 in_channels=1,
-                out_channels=3,
-                kernel_size=5,
+                out_channels=1,
+                kernel_size=21,
                 stride=1,
-                padding=2,
+                padding=10,
                 padding_mode="circular",
                 bias=False,
             ),
             nn.ReLU(),
             nn.Conv2d(
-                in_channels=3,
+                in_channels=1,
                 out_channels=10,
                 kernel_size=1,
                 stride=1,
@@ -46,7 +46,7 @@ class NCA(nn.Module):
     def forward(self, x, steps):
         seq = [x]
         for _ in range(steps):
-            x = torch.sigmoid(x + self.net(x))
+            x = torch.tanh(x + self.net(x))
             seq.append(x)
 
         return torch.stack(seq, dim=1)
@@ -56,7 +56,15 @@ class NCASim(nn.Module):
     def __init__(self, in_size) -> None:
         super().__init__()
         self.ca = NCA()
-        self.expand = nn.Sequential(nn.Linear())
+        self.decoder = nn.Sequential(
+            nn.Linear(64 * 64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 16),
+            nn.Sigmoid(),
+        )
+
+    def seed(self, bs, msg_size):
+        torch.rand()
 
 
 if __name__ == "__main__":
