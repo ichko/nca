@@ -1,7 +1,8 @@
 {
     "python.formatting.provider": "none",
     "cSpell.words": [
-        "Conv"
+        "Conv",
+        "lerp"
     ],
     "esbonio.sphinx.confDir": "",
     "restructuredtext.preview.docutils.disabled": true,

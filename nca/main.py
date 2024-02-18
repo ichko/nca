@@ -8,15 +8,6 @@ from tqdm.auto import tqdm
 import matplotlib.animation as animation
 
 
-class Reshape(nn.Module):
-    def __init__(self, shape):
-        super().__init__()
-        self.shape = shape
-
-    def forward(self, x):
-        return x.reshape(-1, *self.shape)
-
-
 class Decoder(nn.Module):
     def __init__(self, from_shape, latent_size):
         super().__init__()

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import torchvision
 from matplotlib import cm
 import matplotlib.pyplot as plt
-import utils
+import nca.external_utils as external_utils
 from tqdm import tqdm
 
 
@@ -90,10 +90,10 @@ if __name__ == "__main__":
         multi_seqs.append(seq[0])
     multi_seqs = torch.stack(multi_seqs, dim=0)
 
-    with utils.VideoWriter(filename="vid.ignore.mp4", fps=5) as vid:
+    with external_utils.VideoWriter(filename="vid.ignore.mp4", fps=5) as vid:
         for i in range(seq_len):
             frame_batch = multi_seqs[:, i]
             frame_batch = torchvision.utils.make_grid(frame_batch, padding=2, nrow=7)
             frame_batch = frame_batch.permute(1, 2, 0)
 
-            vid.add(utils.zoom(frame_batch, scale=3))
+            vid.add(external_utils.zoom(frame_batch, scale=3))
