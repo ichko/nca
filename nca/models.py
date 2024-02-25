@@ -1,3 +1,7 @@
+import torch.nn as nn
+import torch
+from nca.nn_utils import Lambda, LinerInDim, Permute, conv_same
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,7 +10,7 @@ from matplotlib import cm
 import matplotlib.pyplot as plt
 import nca.external_utils as external_utils
 from tqdm import tqdm
-from nca.utils import LinerInDim
+from nca.nn_utils import LinerInDim
 
 
 class NCA(nn.Module):
@@ -68,33 +72,44 @@ class NCASim(nn.Module):
         torch.rand()
 
 
-if __name__ == "__main__":
-    seq_len = 60
+class BasicNCA(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
 
-    multi_seqs = []
-    inp = torch.zeros(1, 1, 64, 64)
-    nn.init.uniform_(inp[0, 0, 20:40, 20:40])
-    inp = (inp > 0.9).float()
-    cmap = cm.get_cmap("viridis")
+        self.kernel = nn.Sequential(
+            conv_same(1, 1, ks=11),
+        )
+        for p in self.kernel.parameters():
+            nn.init.uniform_(p)
 
-    for i in tqdm(range(49)):
-        model = NCA()
+        self.rule = nn.Sequential(
+            Lambda(lambda x: x),
+            nn.Linear(1, 10),
+            nn.ReLU(),
+            nn.Linear(10, 10),
+            nn.ReLU(),
+            nn.Linear(10, 1),
+        )
 
-        seq = model.forward(inp, steps=seq_len)
-        seq = seq.detach().cpu().numpy()
-        mi, ma = seq.min(), seq.max()
-        seq = (seq[:, :, 0] - mi) / (ma - mi)
-        seq = cmap(seq)[..., :3]
-        bs, _seq_len, h, w, c = seq.shape
-        seq = torch.tensor(seq).permute(0, 1, 4, 2, 3)
+        self.conv_rule = nn.Sequential(
+            Permute([0, 3, 2, 1]),
+            self.rule,
+            Permute([0, 3, 2, 1]),
+        )
 
-        multi_seqs.append(seq[0])
-    multi_seqs = torch.stack(multi_seqs, dim=0)
+    def forward(self, x, steps):
+        seq = [x]
+        for i in range(steps):
+            out = self.kernel(x)
+            out = self.conv_rule(out)
+            out = torch.sigmoid(out) * 2 - 1
+            x = torch.clip(x + out, 0, 1)
+            seq.append(x)
 
-    with external_utils.VideoWriter(filename="vid.ignore.mp4", fps=5) as vid:
-        for i in range(seq_len):
-            frame_batch = multi_seqs[:, i]
-            frame_batch = torchvision.utils.make_grid(frame_batch, padding=2, nrow=7)
-            frame_batch = frame_batch.permute(1, 2, 0)
+        return seq
 
-            vid.add(external_utils.zoom(frame_batch, scale=3))
+
+class MsgEncoder(nn.Module):
+    def __init__(self, msg_size, im_size):
+        super().__init__()
+        self.net = nn.Sequential(Lambda(), nn.Conv2d(1))
