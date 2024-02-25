@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import nca.external_utils as external_utils
 from tqdm import tqdm
 from nca.nn_utils import LinerInDim
+from kornia import augmentation
 
 
 class NCA(nn.Module):
@@ -70,6 +71,32 @@ class NCASim(nn.Module):
 
     def seed(self, bs, msg_size):
         torch.rand()
+
+
+class FCInvAE(nn.Module):
+    """Fully connected Inverted auto-encoder"""
+
+    def __init__(self, msg_size, frame_size) -> None:
+        super().__init__()
+
+        self.encoder = nn.Sequential(
+            nn.Linear(msg_size, 20),
+            nn.ReLU(),
+            nn.Linear(20, self.frame_size * frame_size),
+        )
+
+        self.decoder = nn.Sequential(
+            nn.Linear(frame_size * frame_size, 20),
+            nn.ReLU(),
+            nn.Linear(20, msg_size),
+        )
+
+        self.noiser = nn.Sequential(
+            augmentation.RandomGaussianNoise(0, 1, same_on_batch=False, p=0.5),
+            augmentation.RandomAffine(
+                degrees=[-10, 10], translate=[0.1, 0.1], scale=1, p=0.5
+            ),
+        )
 
 
 class BasicNCA(nn.Module):
