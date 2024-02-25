@@ -6,6 +6,7 @@ from matplotlib import cm
 import matplotlib.pyplot as plt
 import nca.external_utils as external_utils
 from tqdm import tqdm
+from nca.utils import LinerInDim
 
 
 class NCA(nn.Module):

@@ -127,7 +127,6 @@ class VideoWriter:
         fn = self.params["filename"]
         display(mvp.ipython_display(fn, **kw))
 
-
 class LoopWriter(VideoWriter):
     def __init__(self, *a, cross_len=1.0, **kw):
         super().__init__(*a, **kw)

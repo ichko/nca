@@ -29,3 +29,17 @@ class LinerInDim(nn.Module):
         x = x.permute(*x_dims)
 
         return x
+
+
+class Lambda(nn.Module):
+    def __init__(self, handler):
+        super().__init__()
+        self.handler = handler
+
+    def forward(self, x):
+        return self.handler(x)
+
+
+class Permute(Lambda):
+    def __init__(self, permutation):
+        super().__init__(lambda x: x.permute(permutation))

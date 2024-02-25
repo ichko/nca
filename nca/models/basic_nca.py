@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+from nca.utils import LinerInDim, Permute
 
 
 def conv11(in_channels, out_channels, bias):
@@ -24,29 +25,43 @@ def conv_same(in_channels, out_channels, ks, bias=False):
     )
 
 
+def growth(U):
+    """Bosco's rule, b1..b2 is birth range, s1..s2 is stable range (outside s1..s2 is shrink range)"""
+    b1, b2, s1, s2 = 34, 45, 34, 58
+    return ((U >= b1) & (U <= b2)).to(torch.float32) - ((U < s1) | (U > s2)).to(
+        torch.float32
+    )
+
+
 class BasicNCA(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
         self.kernel = nn.Sequential(
-            conv_same(1, 1, ks=5),
+            conv_same(1, 1, ks=11),
         )
-        for p in self.kernel.parameters():
-            nn.init.uniform_(p)
+        # for p in self.kernel.parameters():
+        #     nn.init.ones_(p)
 
         self.rule = nn.Sequential(
-            conv11(1, 10, bias=False),
-            nn.Tanh(),
-            conv11(10, 1, bias=False),
-            nn.Sigmoid(),
+            nn.Linear(1, 10),
+            nn.ReLU(),
+            nn.Linear(10, 10),
+            nn.ReLU(),
+            nn.Linear(10, 1),
+        )
+
+        self.conv_rule = nn.Sequential(
+            Permute([0, 3, 2, 1]),
+            self.rule,
+            Permute([0, 3, 2, 1]),
         )
 
     def forward(self, x, steps):
         seq = [x]
         for i in range(steps):
             out = self.kernel(x)
-            out = torch.exp(-((out - 2) ** 2) * 2) * 2 - 1
-            # out = self.rule(out)
+            out = self.conv_rule(out)
 
             x = torch.clip(x + out, 0, 1)
 

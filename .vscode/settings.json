@@ -1,11 +1,4 @@
 {
-    "python.formatting.provider": "none",
-    "cSpell.words": [
-        "Conv",
-        "lerp"
-    ],
-    "esbonio.sphinx.confDir": "",
-    "restructuredtext.preview.docutils.disabled": true,
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter"
     }
