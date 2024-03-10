@@ -6,7 +6,7 @@
         {
             "label": "echo",
             "type": "shell",
-            "command": "poetry run python -m nca.nca",
+            "command": "poetry run python ${file}",
             "problemMatcher": [],
             "group": {
                 "kind": "build",

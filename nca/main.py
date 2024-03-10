@@ -1,11 +1,11 @@
+import kornia
+import matplotlib.animation as animation
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
-import kornia
 from tqdm.auto import tqdm
-import matplotlib.animation as animation
 
 
 class Decoder(nn.Module):

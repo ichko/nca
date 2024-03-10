@@ -1,11 +1,11 @@
-from flask import Flask, Response
+import multiprocessing as mp
+import socket
+import threading
+from contextlib import closing
+
 import cv2
 import numpy as np
-import multiprocessing as mp
-import threading
-import socket
-from contextlib import closing
-from flask import request
+from flask import Flask, Response, request
 from werkzeug.serving import make_server
 
 

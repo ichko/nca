@@ -1,18 +1,18 @@
 # @title Imports and Notebook Utilities
-import os
-import io
-import PIL.Image, PIL.ImageDraw
 import base64
-import zipfile
-import json
-import requests
-import numpy as np
-import matplotlib.pylab as pl
 import glob
-from IPython.display import display
+import io
+import json
+import os
+import zipfile
 
-from IPython.display import Image, HTML, Markdown, clear_output
-from tqdm import tqdm_notebook, tnrange
+import matplotlib.pylab as pl
+import numpy as np
+import PIL.Image
+import PIL.ImageDraw
+import requests
+from IPython.display import HTML, Image, Markdown, clear_output, display
+from tqdm import tnrange, tqdm_notebook
 
 
 def imread(url, max_size=None, mode=None):
