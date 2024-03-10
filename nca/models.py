@@ -1,17 +1,14 @@
-import torch.nn as nn
-import torch
-from nca.nn_utils import Lambda, LinerInDim, Permute, conv_same
-
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
-from matplotlib import cm
-import matplotlib.pyplot as plt
-import nca.external_utils as external_utils
-from tqdm import tqdm
-from nca.nn_utils import LinerInDim
 from kornia import augmentation
+from matplotlib import cm
+from tqdm import tqdm
+
+import nca.external_utils as external_utils
+from nca.utils import Lambda, LinerInDim, Permute, conv_same
 
 
 class NCA(nn.Module):
@@ -58,47 +55,6 @@ class NCA(nn.Module):
         return torch.stack(seq, dim=1)
 
 
-class NCASim(nn.Module):
-    def __init__(self, in_size) -> None:
-        super().__init__()
-        self.ca = NCA()
-        self.decoder = nn.Sequential(
-            nn.Linear(64 * 64, 32),
-            nn.ReLU(),
-            nn.Linear(32, 16),
-            nn.Sigmoid(),
-        )
-
-    def seed(self, bs, msg_size):
-        torch.rand()
-
-
-class FCInvAE(nn.Module):
-    """Fully connected Inverted auto-encoder"""
-
-    def __init__(self, msg_size, frame_size) -> None:
-        super().__init__()
-
-        self.encoder = nn.Sequential(
-            nn.Linear(msg_size, 20),
-            nn.ReLU(),
-            nn.Linear(20, self.frame_size * frame_size),
-        )
-
-        self.decoder = nn.Sequential(
-            nn.Linear(frame_size * frame_size, 20),
-            nn.ReLU(),
-            nn.Linear(20, msg_size),
-        )
-
-        self.noiser = nn.Sequential(
-            augmentation.RandomGaussianNoise(0, 1, same_on_batch=False, p=0.5),
-            augmentation.RandomAffine(
-                degrees=[-10, 10], translate=[0.1, 0.1], scale=1, p=0.5
-            ),
-        )
-
-
 class BasicNCA(nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -136,7 +92,110 @@ class BasicNCA(nn.Module):
         return seq
 
 
-class MsgEncoder(nn.Module):
-    def __init__(self, msg_size, im_size):
+class FCInvAE(nn.Module):
+    """Fully connected Inverted auto-encoder"""
+
+    def __init__(self, msg_size, frame_size, lr) -> None:
         super().__init__()
-        self.net = nn.Sequential(Lambda(), nn.Conv2d(1))
+        self.msg_size = msg_size
+        self.frame_size = frame_size
+
+        self.encoder = nn.Sequential(
+            nn.Linear(msg_size, 100),
+            nn.ReLU(),
+            nn.BatchNorm1d(100),
+            nn.Linear(100, frame_size * frame_size),
+            nn.Sigmoid(),
+        )
+
+        self.decoder = nn.Sequential(
+            nn.Linear(frame_size * frame_size, 100),
+            nn.ReLU(),
+            nn.BatchNorm1d(100),
+            nn.Linear(100, msg_size),
+        )
+
+        self.optim = torch.optim.Adam(self.parameters(), lr=lr)
+
+    def noise(self, frame, noise_size):
+        noiser = nn.Sequential(
+            augmentation.RandomGaussianNoise(0, noise_size, same_on_batch=False, p=1),
+            augmentation.RandomAffine(
+                degrees=[-10, 10], translate=[0.1, 0.1], scale=[0.9, 1.1], p=0.5
+            ),
+        )
+        return noiser(frame)
+
+    def encode(self, msg):
+        x = self.encoder(msg)
+        return x.reshape(-1, 1, self.frame_size, self.frame_size)
+
+    def decode(self, frame):
+        bs = frame.shape[0]
+        frame = frame.reshape(bs, -1)
+        x = self.decoder(frame)
+        return x
+
+    def forward_msg(self, msg, noise_size):
+        generated_image = self.encode(msg)
+        noised_image = self.noise(generated_image, noise_size)
+        decoded_msg = self.decode(noised_image)
+        return {
+            "msg": msg,
+            "image": generated_image,
+            "noised_image": noised_image,
+            "decoded_msg": decoded_msg,
+        }
+
+    def forward(self, bs, noise_size):
+        msg = self.sample_msg(bs)
+        return self.forward_msg(msg, noise_size)
+
+    def optim_step(self, bs, noise_size):
+        out = self.forward(bs, noise_size)
+        loss = F.mse_loss(out["decoded_msg"], out["msg"])
+
+        self.optim.zero_grad()
+        loss.backward()
+        self.optim.step()
+
+        return loss.item(), out
+
+    def sample_msg(self, bs):
+        return torch.rand(bs, self.msg_size)
+
+    def render_out(self, out):
+        out = {k: v.detach().cpu().numpy() for k, v in out.items()}
+        bs = out["msg"].shape[0]
+
+        size = 3
+        rows = bs
+        cols = 5
+        fig, axs = plt.subplots(rows, cols, dpi=100, figsize=(cols * size, rows * size))
+        plt.tight_layout()
+        if rows == 1:
+            axs = [axs]
+
+        for b in range(bs):
+            if b == 0:
+                axs[b][0].set_title("input msg")
+                axs[b][1].set_title("generated image")
+                axs[b][2].set_title("noised image")
+                axs[b][3].set_title("decoded msg")
+                axs[b][4].set_title("msg difference")
+
+            # axs[b][0].axis("off")
+            axs[b][1].axis("off")
+            axs[b][2].axis("off")
+            # axs[b][3].axis("off")
+
+            axs[b][0].bar(range(out["msg"].shape[1]), out["msg"][b])
+            axs[b][1].imshow(out["image"][b][0])
+            axs[b][2].imshow(out["noised_image"][b][0])
+            axs[b][3].bar(range(out["msg"].shape[1]), out["decoded_msg"][b])
+            axs[b][4].bar(
+                range(out["msg"].shape[1]), out["msg"][b] - out["decoded_msg"][b]
+            )
+
+        plt.close()
+        return fig
