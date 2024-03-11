@@ -95,33 +95,38 @@ class BasicNCA(nn.Module):
 class FCInvAE(nn.Module):
     """Fully connected Inverted auto-encoder"""
 
-    def __init__(self, msg_size, frame_size, lr) -> None:
+    def __init__(self, msg_size, frame_size) -> None:
         super().__init__()
         self.msg_size = msg_size
         self.frame_size = frame_size
 
         self.encoder = nn.Sequential(
             nn.Linear(msg_size, 100),
-            nn.ReLU(),
             nn.BatchNorm1d(100),
+            nn.ReLU(),
+            nn.Linear(100, 100),
+            nn.BatchNorm1d(100),
+            nn.ReLU(),
             nn.Linear(100, frame_size * frame_size),
             nn.Sigmoid(),
         )
 
         self.decoder = nn.Sequential(
             nn.Linear(frame_size * frame_size, 100),
-            nn.ReLU(),
             nn.BatchNorm1d(100),
+            nn.ReLU(),
+            nn.Linear(100, 100),
+            nn.BatchNorm1d(100),
+            nn.ReLU(),
             nn.Linear(100, msg_size),
+            nn.Sigmoid(),
         )
-
-        self.optim = torch.optim.Adam(self.parameters(), lr=lr)
 
     def noise(self, frame, noise_size):
         noiser = nn.Sequential(
             augmentation.RandomGaussianNoise(0, noise_size, same_on_batch=False, p=1),
             augmentation.RandomAffine(
-                degrees=[-10, 10], translate=[0.1, 0.1], scale=[0.9, 1.1], p=0.5
+                degrees=[-10, 10], translate=[0.1, 0.1], scale=[0.9, 1.1], p=noise_size
             ),
         )
         return noiser(frame)
@@ -151,24 +156,24 @@ class FCInvAE(nn.Module):
         msg = self.sample_msg(bs)
         return self.forward_msg(msg, noise_size)
 
-    def optim_step(self, bs, noise_size):
+    def optim_step(self, bs, noise_size, lr):
+        optim = torch.optim.Adam(self.parameters(), lr=lr)
         out = self.forward(bs, noise_size)
         loss = F.mse_loss(out["decoded_msg"], out["msg"])
 
-        self.optim.zero_grad()
+        optim.zero_grad()
         loss.backward()
-        self.optim.step()
+        optim.step()
 
         return loss.item(), out
 
     def sample_msg(self, bs):
         return torch.rand(bs, self.msg_size)
 
-    def render_out(self, out):
+    def render_out(self, out, size=3):
         out = {k: v.detach().cpu().numpy() for k, v in out.items()}
         bs = out["msg"].shape[0]
 
-        size = 3
         rows = bs
         cols = 5
         fig, axs = plt.subplots(rows, cols, dpi=100, figsize=(cols * size, rows * size))
