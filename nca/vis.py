@@ -45,10 +45,13 @@ def display_generator_async(displayable_iterator, sleep=0):
     return thread
 
 
-def display_generator_decorator(sleep=0):
+def display_generator_decorator(sleep=0, block=False):
     def decorator(generator_ctor):
         generator = generator_ctor()
-        display_generator_async(generator, sleep)
+        if block:
+            display_generator(generator, sleep)
+        else:
+            display_generator_async(generator, sleep)
 
     return decorator
 
