@@ -1,3 +1,15 @@
+import numpy as np
+import lightning as L
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+
+from lightning.pytorch.loggers import TensorBoardLogger
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.profilers import AdvancedProfiler
+from lightning.pytorch.callbacks import DeviceStatsMonitor
+import lightning as L
+import torch
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -14,6 +26,8 @@ class Reshape(nn.Module):
 
 
 class LinerInDim(nn.Module):
+    """A linear layer applied at a specific dimension"""
+
     def __init__(self, in_size, out_size, dim=-1):
         super().__init__()
         self.dim = dim
@@ -62,6 +76,7 @@ def conv_same(in_channels, out_channels, ks, bias=False):
         padding=ks // 2,
         stride=1,
         bias=bias,
+        padding_mode="circular",
     )
 
 
@@ -89,3 +104,34 @@ def bosco_update(U):
     return ((U >= b1) & (U <= b2)).to(torch.float32) - ((U < s1) | (U > s2)).to(
         torch.float32
     )
+
+
+def get_lightning_trainer(model_name, max_epochs, device="cpu"):
+    # optim_metric = "metric_val_mean_F1"
+    # optim_metric_mode = "max"
+    optim_metric = "val_loss"
+    optim_metric_mode = "min"
+
+    logger = TensorBoardLogger("logs/", name=model_name)
+    early_stop = EarlyStopping(
+        monitor=optim_metric, mode=optim_metric_mode, patience=50
+    )
+    checkpoint_callback = ModelCheckpoint(
+        dirpath="checkpoints/",
+        save_top_k=5,
+        monitor=optim_metric,
+        mode=optim_metric_mode,
+    )
+    profiler = AdvancedProfiler(dirpath=".", filename="perf_logs")
+    # device_monitor = DeviceStatsMonitor(cpu_stats=False)
+
+    trainer = L.Trainer(
+        max_epochs=max_epochs,
+        logger=logger,
+        callbacks=[early_stop, checkpoint_callback],
+        profiler=profiler,
+        gradient_clip_val=0.1,
+        accelerator=device,
+    )
+
+    return trainer

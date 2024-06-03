@@ -2,61 +2,13 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision
 from kornia import augmentation
-from matplotlib import cm
-from tqdm import tqdm
-
-import nca.external_utils as external_utils
-from nca.utils import Lambda, LinerInDim, Permute, conv_same
+from lightning import LightningModule
+from nca.utils import Lambda, Permute, conv_same
 
 
-class NCA(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(
-                in_channels=1,
-                out_channels=1,
-                kernel_size=21,
-                stride=1,
-                padding=10,
-                padding_mode="circular",
-                bias=False,
-            ),
-            nn.ReLU(),
-            nn.Conv2d(
-                in_channels=1,
-                out_channels=10,
-                kernel_size=1,
-                stride=1,
-                padding=0,
-                bias=False,
-            ),
-            nn.ReLU(),
-            nn.Conv2d(
-                in_channels=10,
-                out_channels=1,
-                kernel_size=1,
-                stride=1,
-                padding=0,
-                bias=False,
-            ),
-        )
-        for p in self.parameters():
-            nn.init.normal_(p, 0, 0.8)
-
-    def forward(self, x, steps):
-        seq = [x]
-        for _ in range(steps):
-            x = torch.tanh(x + self.net(x))
-            seq.append(x)
-
-        return torch.stack(seq, dim=1)
-
-
-class BasicNCA(nn.Module):
-    def __init__(self) -> None:
+class BaselineNCA(LightningModule):
+    def __init__(self, lr) -> None:
         super().__init__()
 
         self.kernel = nn.Sequential(
@@ -79,6 +31,7 @@ class BasicNCA(nn.Module):
             self.rule,
             Permute([0, 3, 2, 1]),
         )
+        self.lr = lr
 
     def forward(self, x, steps):
         seq = [x]
@@ -90,6 +43,18 @@ class BasicNCA(nn.Module):
             seq.append(x)
 
         return seq
+
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters(), lr=self.lr)
+
+    def optim_step(self, batch):
+        self.zero_grad()
+        out = self.out(batch["seed"])
+        loss = self.criterion()
+
+    def training_step(self, batch, batch_index):
+        loss = self.optim_step(batch, "train")
+        return loss
 
 
 class FCInvAE(nn.Module):

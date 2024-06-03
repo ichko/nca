@@ -18,6 +18,8 @@ torch = "^2.2.0"
 torchvision = "^0.17.0"
 kornia = "^0.7.1"
 aesthetic-tensor = {path = "../aesthetic-tensor", develop = true}
+lightning = "^2.2.5"
+tensorboard = "^2.16.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
