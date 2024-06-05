@@ -1,13 +1,39 @@
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from kornia import augmentation
-from lightning import LightningModule
+from tqdm.auto import tqdm
 from nca.utils import Lambda, Permute, conv_same
 
 
-class BaselineNCA(LightningModule):
+class BaseModule(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.loss_history = []
+
+    def fit(self, its, *args, **kwargs):
+        pbar = tqdm(range(its))
+        for it in pbar:
+            optim_res = self.optim_step(*args, **kwargs)
+            loss, info = optim_res
+            pbar.set_description(f"Loss: {loss:0.5f}")
+            self.loss_history.append(loss)
+
+    def plot_loss(self):
+        fig, ax = plt.subplots(dpi=120, figsize=(8, 4))
+        ax.plot(range(len(self.loss_history)), self.loss_history)
+        ax.set_yscale("log")
+
+        plt.close()
+        return fig
+
+    @property
+    def device(self):
+        return next(self.parameters()).device
+
+
+class BaselineNCA(BaseModule):
     def __init__(self, lr) -> None:
         super().__init__()
 
@@ -48,16 +74,13 @@ class BaselineNCA(LightningModule):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
 
     def optim_step(self, batch):
+        seed, steps = batch["seed"], batch["steps"]
         self.zero_grad()
         out = self.out(batch["seed"])
         loss = self.criterion()
 
-    def training_step(self, batch, batch_index):
-        loss = self.optim_step(batch, "train")
-        return loss
 
-
-class FCInvAE(nn.Module):
+class FCInvAE(BaseModule):
     """Fully connected Inverted auto-encoder"""
 
     def __init__(self, msg_size, frame_size) -> None:
@@ -91,7 +114,7 @@ class FCInvAE(nn.Module):
         noiser = nn.Sequential(
             augmentation.RandomGaussianNoise(0, noise_size, same_on_batch=False, p=1),
             augmentation.RandomAffine(
-                degrees=[-10, 10], translate=[0.1, 0.1], scale=[0.9, 1.1], p=noise_size
+                degrees=(-10, 10), translate=(0.1, 0.1), scale=(0.9, 1.1), p=noise_size
             ),
         )
         return noiser(frame)
@@ -133,7 +156,7 @@ class FCInvAE(nn.Module):
         return loss.item(), out
 
     def sample_msg(self, bs):
-        return torch.rand(bs, self.msg_size)
+        return torch.rand(bs, self.msg_size).to(self.device)
 
     def render_out(self, out, size=3):
         out = {k: v.detach().cpu().numpy() for k, v in out.items()}

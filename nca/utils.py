@@ -80,31 +80,6 @@ def conv_same(in_channels, out_channels, ks, bias=False):
     )
 
 
-BOSCO_INIT = torch.tensor(
-    [
-        [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-        [0, 0, 1, 1, 1, 1, 1, 0, 0, 0],
-        [0, 1, 1, 0, 0, 1, 1, 1, 1, 0],
-        [1, 1, 0, 0, 0, 1, 1, 1, 1, 1],
-        [1, 0, 0, 0, 0, 0, 1, 1, 1, 1],
-        [1, 1, 0, 0, 0, 0, 1, 1, 1, 1],
-        [1, 1, 1, 0, 1, 1, 1, 1, 1, 1],
-        [0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-        [0, 1, 1, 1, 1, 1, 1, 1, 0, 0],
-        [0, 0, 1, 1, 1, 1, 1, 0, 0, 0],
-        [0, 0, 0, 1, 1, 1, 0, 0, 0, 0],
-    ],
-    dtype=float,
-)
-
-
-def bosco_update(U):
-    """Bosco's rule, b1..b2 is birth range, s1..s2 is stable range (outside s1..s2 is shrink range)"""
-    b1, b2, s1, s2 = 34, 45, 34, 58
-    return ((U >= b1) & (U <= b2)).to(torch.float32) - ((U < s1) | (U > s2)).to(
-        torch.float32
-    )
-
 
 def get_lightning_trainer(model_name, max_epochs, device="cpu"):
     # optim_metric = "metric_val_mean_F1"
