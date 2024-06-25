@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from kornia import augmentation
 from tqdm.auto import tqdm
 from nca.utils import Lambda, Permute, conv_same
+import numpy as np
 
 
 class BaseModule(nn.Module):
@@ -34,50 +35,50 @@ class BaseModule(nn.Module):
 
 
 class BaselineNCA(BaseModule):
-    def __init__(self, lr) -> None:
+    def __init__(self, hidden_n=6, zero_w2=True, device="cuda"):
         super().__init__()
+        self.filters = torch.stack(
+            [
+                torch.tensor([[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 0.0]]),
+                torch.tensor([[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]]),
+                torch.tensor([[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]]).T,
+                torch.tensor([[1.0, 2.0, 1.0], [2.0, -12, 2.0], [1.0, 2.0, 1.0]]),
+            ]
+        ).to(device)
+        # self.filters = torch.randn_like(self.filters)
+        self.chn = 4
 
-        self.kernel = nn.Sequential(
-            conv_same(1, 1, ks=11),
-        )
-        for p in self.kernel.parameters():
-            nn.init.uniform_(p)
+        self.w1 = nn.Conv2d(4 * 4, hidden_n, 1).to(device)
+        self.relu = nn.ReLU()
+        self.w2 = nn.Conv2d(hidden_n, 4, 1, bias=True).to(device)
+        self.w3 = nn.Conv2d(hidden_n, 4, 1).to(device)
 
-        self.rule = nn.Sequential(
-            Lambda(lambda x: x),
-            nn.Linear(1, 10),
-            nn.ReLU(),
-            nn.Linear(10, 10),
-            nn.ReLU(),
-            nn.Linear(10, 1),
-        )
+        if zero_w2:
+            self.w2.weight.data.zero_()
 
-        self.conv_rule = nn.Sequential(
-            Permute([0, 3, 2, 1]),
-            self.rule,
-            Permute([0, 3, 2, 1]),
-        )
-        self.lr = lr
+    def perchannel_conv(self, x, filters):
+        b, ch, h, w = x.shape
+        y = x.reshape(b * ch, 1, h, w)
+        y = torch.nn.functional.pad(y, [1, 1, 1, 1], "circular")
+        y = torch.nn.functional.conv2d(y, filters[:, None])
+        return y.reshape(b, -1, h, w)
 
-    def forward(self, x, steps):
+    def forward(self, x, update_rate=0.5):
+        y = self.perchannel_conv(x, self.filters)
+        hid = self.relu(self.w1(y))
+        y = self.w2(hid)
+        y = torch.tanh(y)
+        l = torch.sigmoid(self.w3(hid))
+
+        return x * l + (1 - l) * y
+
+    def forward_many(self, x, steps):
         seq = [x]
-        for i in range(steps):
-            out = self.kernel(x)
-            out = self.conv_rule(out)
-            out = torch.sigmoid(out) * 2 - 1
-            x = torch.clip(x + out, 0, 1)
+        for _ in range(steps):
+            x = self.forward(x)
             seq.append(x)
 
         return seq
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
-
-    def optim_step(self, batch):
-        seed, steps = batch["seed"], batch["steps"]
-        self.zero_grad()
-        out = self.out(batch["seed"])
-        loss = self.criterion()
 
 
 class FCInvAE(BaseModule):
@@ -91,10 +92,10 @@ class FCInvAE(BaseModule):
         self.encoder = nn.Sequential(
             nn.Linear(msg_size, 100),
             nn.BatchNorm1d(100),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(100, 100),
             nn.BatchNorm1d(100),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(100, frame_size * frame_size),
             nn.Sigmoid(),
         )
@@ -102,22 +103,27 @@ class FCInvAE(BaseModule):
         self.decoder = nn.Sequential(
             nn.Linear(frame_size * frame_size, 100),
             nn.BatchNorm1d(100),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(100, 100),
             nn.BatchNorm1d(100),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(100, msg_size),
             nn.Sigmoid(),
         )
 
-    def noise(self, frame, noise_size):
-        noiser = nn.Sequential(
-            augmentation.RandomGaussianNoise(0, noise_size, same_on_batch=False, p=1),
+        noise_size = 1
+        self.noiser = nn.Sequential(
             augmentation.RandomAffine(
                 degrees=(-10, 10), translate=(0.1, 0.1), scale=(0.9, 1.1), p=noise_size
             ),
+            # augmentation.RandomBoxBlur(kernel_size=(5, 5), p=noise_size),
+            # augmentation.RandomErasing((0.1, 0.2), (0.3, 1 / 0.3), p=noise_size),
+            # augmentation.RandomJigsaw(grid=(4, 4), p=noise_size),
+            augmentation.RandomGaussianNoise(0.5, 1, same_on_batch=False, p=noise_size),
         )
-        return noiser(frame)
+
+    def noise(self, frame, noise_size):
+        return self.noiser(frame)
 
     def encode(self, msg):
         x = self.encoder(msg)
@@ -169,6 +175,9 @@ class FCInvAE(BaseModule):
         if rows == 1:
             axs = [axs]
 
+        for ax in [ax[-1] for ax in axs]:
+            ax.set_ylim(0, 1)
+
         for b in range(bs):
             if b == 0:
                 axs[b][0].set_title("input msg")
@@ -186,8 +195,11 @@ class FCInvAE(BaseModule):
             axs[b][1].imshow(out["image"][b][0])
             axs[b][2].imshow(out["noised_image"][b][0])
             axs[b][3].bar(range(out["msg"].shape[1]), out["decoded_msg"][b])
+            diff = out["msg"][b] - out["decoded_msg"][b]
             axs[b][4].bar(
-                range(out["msg"].shape[1]), out["msg"][b] - out["decoded_msg"][b]
+                range(len(diff)),
+                abs(diff),
+                color=np.array(["red", "blue"])[(diff > 0).astype(int)],
             )
 
         plt.close()

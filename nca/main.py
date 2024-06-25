@@ -97,9 +97,9 @@ def main():
     noise = nn.Sequential(
         kornia.augmentation.RandomAffine(
             degrees=30,
-            translate=[0.15, 0.15],
-            scale=[0.85, 1.16],
-            shear=[-10, 10],
+            translate=(0.15, 0.15),
+            scale=(0.85, 1.16),
+            shear=(-10, 10),
         ),
         # kornia.augmentation.RandomPerspective(0.6, p=0.5),
         kornia.augmentation.RandomGaussianNoise(mean=0, std=1, p=1),
