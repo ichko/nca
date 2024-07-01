@@ -80,7 +80,6 @@ def conv_same(in_channels, out_channels, ks, bias=False):
     )
 
 
-
 def get_lightning_trainer(model_name, max_epochs, device="cpu"):
     # optim_metric = "metric_val_mean_F1"
     # optim_metric_mode = "max"

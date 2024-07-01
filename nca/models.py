@@ -8,33 +8,7 @@ from nca.utils import Lambda, Permute, conv_same
 import numpy as np
 
 
-class BaseModule(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.loss_history = []
-
-    def fit(self, its, *args, **kwargs):
-        pbar = tqdm(range(its))
-        for it in pbar:
-            optim_res = self.optim_step(*args, **kwargs)
-            loss, info = optim_res
-            pbar.set_description(f"Loss: {loss:0.5f}")
-            self.loss_history.append(loss)
-
-    def plot_loss(self):
-        fig, ax = plt.subplots(dpi=120, figsize=(8, 4))
-        ax.plot(range(len(self.loss_history)), self.loss_history)
-        ax.set_yscale("log")
-
-        plt.close()
-        return fig
-
-    @property
-    def device(self):
-        return next(self.parameters()).device
-
-
-class BaselineNCA(BaseModule):
+class BaselineNCA(nn.Module):
     def __init__(self, hidden_n=6, zero_w2=True, device="cuda"):
         super().__init__()
         self.filters = torch.stack(
@@ -81,9 +55,34 @@ class BaselineNCA(BaseModule):
         return seq
 
 
-class FCInvAE(BaseModule):
-    """Fully connected Inverted auto-encoder"""
+class SimpleNCA(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
 
+        self.kernel = nn.Sequential(
+            conv_same(1, 1, ks=11),
+        )
+        self.rule = nn.Sequential(
+            conv_same(4, 10, ks=1, bias=True),
+            nn.ReLU(),
+            conv_same(10, 10, ks=1, bias=True),
+        )
+        for p in self.kernel.parameters():
+            nn.init.uniform_(p)
+
+    def forward(self, x, steps):
+        seq = [x]
+        for i in range(steps):
+            out = self.kernel(x)
+            out = self.conv_rule(out)
+            out = torch.sigmoid(out) * 2 - 1
+            x = torch.clip(x + out, 0, 1)
+            seq.append(x)
+
+        return seq
+
+
+class FCInvAE(nn.Module):
     def __init__(self, msg_size, frame_size) -> None:
         super().__init__()
         self.msg_size = msg_size
@@ -162,7 +161,8 @@ class FCInvAE(BaseModule):
         return loss.item(), out
 
     def sample_msg(self, bs):
-        return torch.rand(bs, self.msg_size).to(self.device)
+        device = next(self.parameters()).device
+        return torch.rand(bs, self.msg_size).to(device)
 
     def render_out(self, out, size=3):
         out = {k: v.detach().cpu().numpy() for k, v in out.items()}
