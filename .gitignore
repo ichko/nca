@@ -3,3 +3,4 @@ __pycache__vim
 *.ignore.*
 **/.ipynb_checkpoints/*
 **/__pycache__/*
+.data
