@@ -1,3 +1,4 @@
+from networkx import circulant_graph
 import numpy as np
 import lightning as L
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
@@ -68,7 +69,7 @@ def conv11(in_channels, out_channels, bias):
     )
 
 
-def conv_same(in_channels, out_channels, ks, bias=False):
+def conv_same(in_channels, out_channels, ks, bias=False, padding_mode="circular"):
     return nn.Conv2d(
         in_channels=in_channels,
         out_channels=out_channels,
@@ -76,7 +77,7 @@ def conv_same(in_channels, out_channels, ks, bias=False):
         padding=ks // 2,
         stride=1,
         bias=bias,
-        padding_mode="circular",
+        padding_mode=padding_mode,
     )
 
 
