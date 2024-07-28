@@ -83,7 +83,7 @@ class SimpleNCA(nn.Module):
 
 
 class FCInvAE(nn.Module):
-    def __init__(self, msg_size, frame_size) -> None:
+    def __init__(self, msg_size, frame_size, decode_frame_size) -> None:
         super().__init__()
         self.msg_size = msg_size
         self.frame_size = frame_size
@@ -100,7 +100,7 @@ class FCInvAE(nn.Module):
         )
 
         self.decoder = nn.Sequential(
-            nn.Linear(frame_size * frame_size, 100),
+            nn.Linear(decode_frame_size * decode_frame_size, 100),
             nn.BatchNorm1d(100),
             nn.LeakyReLU(),
             nn.Linear(100, 100),

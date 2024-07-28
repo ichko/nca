@@ -74,7 +74,7 @@ def conv_same(in_channels, out_channels, ks, bias=False, padding_mode="circular"
         in_channels=in_channels,
         out_channels=out_channels,
         kernel_size=ks,
-        padding=ks // 2,
+        padding="same",
         stride=1,
         bias=bias,
         padding_mode=padding_mode,
