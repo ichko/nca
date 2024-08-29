@@ -27,5 +27,6 @@ A repo containing notebooks on experiments with neural cellular automata.
 
 ## Presented at [ALIFE24](https://2024.alife.org/detailed_program.html#postersday2)
 
-- Poster [Google Slides](https://docs.google.com/presentation/d/1VtJ9-sqPK2_n1cC9SwA2SxAglqs_vTcBzSmWKe2UQaQ/edit?usp=sharing)/[PDF](https://drive.google.com/file/d/1icH9ipHgzvZdS5OCtZnvEX_1Gg2Wud2n/view?usp=sharing)
+- [Proposal](https://drive.google.com/file/d/1icH9ipHgzvZdS5OCtZnvEX_1Gg2Wud2n/view?usp=sharing)
+- Poster [Google Slides](https://docs.google.com/presentation/d/1VtJ9-sqPK2_n1cC9SwA2SxAglqs_vTcBzSmWKe2UQaQ/edit?usp=sharing)/[PDF](https://drive.google.com/file/d/1K5fgQdyepRU7mOHOCo6W4qZKD5VS2HQJ/view?usp=sharing)
 - [X Post](https://x.com/ilzhechev/status/1816725317576241177)
