@@ -4,3 +4,4 @@ __pycache__vim
 **/.ipynb_checkpoints/*
 **/__pycache__/*
 .data
+.DS_Store
