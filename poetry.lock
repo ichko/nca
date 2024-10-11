@@ -2168,6 +2168,26 @@ files = [
 traitlets = "*"
 
 [[package]]
+name = "mediapy"
+version = "1.2.2"
+description = "Read/write/show images and videos in an IPython notebook"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "mediapy-1.2.2-py3-none-any.whl", hash = "sha256:2b159c385120c6eca9c88ccf96a19fb2b5b5937c788cf430db637d27270618ba"},
+    {file = "mediapy-1.2.2.tar.gz", hash = "sha256:42d9a1aa93c183550b824dbb4f0de5da61aa5c84db8f01f063acd1f23b90ef0a"},
+]
+
+[package.dependencies]
+ipython = "*"
+matplotlib = "*"
+numpy = "*"
+Pillow = "*"
+
+[package.extras]
+dev = ["absl-py", "pyink", "pylint (>=2.6.0)", "pytest", "pytest-xdist", "pytype"]
+
+[[package]]
 name = "mistune"
 version = "3.0.2"
 description = "A sane and fast Markdown parser with useful plugins and renderers"
@@ -4385,4 +4405,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "ee7ce42dbbe528df4d50ea30f3deab463d12ccef63399b92edfa95ef4e6b87bc"
+content-hash = "5d46e1d99763b6b750dfde554ef68247ad794cd1b126f7c6a33ce12f2a5cf033"
