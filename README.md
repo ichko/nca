@@ -2,6 +2,8 @@
 
 A repo containing notebooks on experiments with neural cellular automata.
 
+## [X Thread with results](https://x.com/ilzhechev/status/1844044270099223021)
+
 ## Main ideas explored
 
 - Optimize for information preservation in a noisy environment - generate macro patters in the NCA simulation.
