@@ -25,6 +25,7 @@ opencv-python = "^4.10.0.84"
 kornia = "^0.7.3"
 pyqtgraph = "^0.13.7"
 mediapy = "^1.2.2"
+scikit-learn = "^1.5.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
