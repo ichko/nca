@@ -1,11 +1,11 @@
-from matplotlib import pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from kornia import augmentation
-from tqdm.auto import tqdm
-from nca.utils import Lambda, Permute, conv_same
-import numpy as np
+from matplotlib import pyplot as plt
+
+from nca.utils import conv_same
 
 
 class BaselineNCA(nn.Module):
@@ -204,3 +204,69 @@ class FCInvAE(nn.Module):
 
         plt.close()
         return fig
+
+
+class NCAAE(nn.Module):
+    def __init__(self, divider_mask) -> None:
+        super().__init__()
+        perc = 3
+        hid = 128
+        self.chans = 8
+        self.divider_mask = divider_mask
+
+        self.seed = nn.Parameter(torch.rand(self.chans, 64, 64) * 2 - 1)
+        self.kernel = nn.Sequential(
+            nn.Dropout2d(p=0.1),
+            conv_same(
+                self.chans,
+                perc * self.chans,
+                ks=5,
+                bias=True,
+                padding_mode="circular",
+            ),
+            nn.BatchNorm2d(perc * self.chans),
+        )
+
+        sobel_x = (
+            torch.tensor([[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]]) / 8
+        )
+        sobel_y = (
+            torch.tensor([[1.0, 2.0, 1.0], [0.0, 0.0, 0.0], [-1.0, -2.0, -1.0]]) / 8
+        )
+        identity = torch.tensor([[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 0.0]])
+        # lap = torch.tensor([[1.0, 2.0, 1.0], [2.0, -12, 2.0], [1.0, 2.0, 1.0]])
+
+        all_filters = torch.stack((identity, sobel_x, sobel_y))
+        all_filters_batch = all_filters.repeat(self.chans, 1, 1).unsqueeze(1)
+        self.all_filters_batch = nn.Parameter(all_filters_batch, requires_grad=False)
+
+        self.rule = nn.Sequential(
+            conv_same(perc * self.chans, hid, ks=1, bias=True),
+            nn.ReLU(),
+            conv_same(hid, self.chans, ks=1, bias=False),
+        )
+
+        nn.init.zeros_(self.rule[-1].weight)
+
+    def forward(self, x, steps=1):
+        seq = [x]
+        device = next(self.parameters()).device
+        x *= 1 - self.divider_mask.to(device)
+        for i in range(steps):
+            old_x = x
+            x = F.conv2d(
+                # F.pad(x, (1, 1, 1, 1), "circular"),
+                F.pad(x, (1, 1, 1, 1), "constant", 0),
+                self.all_filters_batch,
+                stride=1,
+                padding=0,
+                groups=self.chans,
+            )
+            x = self.rule(x)
+            x = old_x + x
+            x *= 1 - self.divider_mask.to(device)
+
+            seq.append(x)
+
+        seq = torch.stack(seq, axis=1)
+        return seq

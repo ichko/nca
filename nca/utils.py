@@ -9,7 +9,6 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.profilers import AdvancedProfiler
 from lightning.pytorch.callbacks import DeviceStatsMonitor
 import lightning as L
-import torch
 
 import matplotlib.pyplot as plt
 import numpy as np
