@@ -20,6 +20,10 @@ A repo containing notebooks on experiments with neural cellular automata.
 
 <table>
   <tr>
+    <td>Classification in the browser</td>
+    <td><img src="./assets/classifying-nca-in-the-browser.gif" style="width: 500px" /></td>
+  </tr>
+  <tr>
     <td>Classification</td>
     <td><img src="./assets/cls-vis.gif" style="width: 500px" /></td>
   </tr>
