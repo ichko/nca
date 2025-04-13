@@ -27,6 +27,7 @@ mediapy = "^1.2.2"
 scikit-learn = "^1.5.2"
 aesthetic-tensor = {git = "https://github.com/ichko/aesthetic-tensor"}
 mlflow = "^2.18.0"
+wandb = "^0.19.9"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
