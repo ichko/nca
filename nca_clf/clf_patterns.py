@@ -16,7 +16,7 @@ def generate_start_pattern(S, num_classes):
         y2 = S // 2 + int(np.sin(tau) * r)
         cv2.line(screen, [x1, y1], [x2, y2], color=1, thickness=2)
 
-    return torch.tensor(screen, dtype=torch.float32)
+    return torch.tensor(screen)
 
 
 class RadialCirclesProcessor:
@@ -50,8 +50,6 @@ class RadialCirclesProcessor:
         f = self.S // 2 - s // 2
         inp[:, :3, f : f + s, f : f + s] = x
 
-        out = (self.screen.unsqueeze(0) == y.unsqueeze(1).unsqueeze(1) + 1).to(
-            torch.float32
-        )
+        out = (self.screen.unsqueeze(0) == y.unsqueeze(1).unsqueeze(1) + 1).float()
 
         return inp, out

@@ -7,8 +7,8 @@ import torch.nn.init as init
 
 # SRC: https://github.com/chenmingxiang110/Growing-Neural-Cellular-Automata/blob/master/lib/CAModel.py
 class NCAModel(nn.Module):
-    def __init__(self, channel_n, fire_rate, device, hidden_size=128):
-        super().__init__()
+    def __init__(self, channel_n, device, hidden_size=128):
+        super(NCAModel, self).__init__()
 
         self.device = device
         self.channel_n = channel_n
@@ -17,7 +17,6 @@ class NCAModel(nn.Module):
         self.fc1 = nn.Linear(hidden_size, channel_n, bias=False)
         init.zeros_(self.fc1.weight)
 
-        self.fire_rate = fire_rate
         self.to(self.device)
 
     def alive(self, x):
@@ -25,7 +24,7 @@ class NCAModel(nn.Module):
 
     def perceive(self, x, angle):
         def _perceive_with(x, weight):
-            conv_weights = torch.from_numpy(weight.astype(np.float32)).to(self.device)
+            conv_weights = torch.tensor(weight, dtype=x.dtype).to(self.device)
             conv_weights = conv_weights.view(1, 1, 3, 3).repeat(self.channel_n, 1, 1, 1)
             return F.conv2d(x, conv_weights, padding=0, groups=self.channel_n)
 
@@ -40,10 +39,10 @@ class NCAModel(nn.Module):
         y2 = _perceive_with(x, w2)
         return y1, y2
 
-    def update(self, x, fire_rate, angle):
+    def update(self, x):
         x_padded = F.pad(x, (1, 1, 1, 1), "circular")
         pre_life_mask = self.alive(x_padded)
-        y1, y2 = self.perceive(x_padded, angle)
+        y1, y2 = self.perceive(x_padded, 0)
         dx = torch.cat([x, y1, y2], dim=1)
 
         dx = dx.permute(0, 2, 3, 1)
@@ -52,22 +51,16 @@ class NCAModel(nn.Module):
         dx = self.fc1(dx)
         dx = dx.permute(0, 3, 1, 2)
 
-        if fire_rate is None:
-            fire_rate = self.fire_rate
-        stochastic = torch.rand([dx.size(0), dx.size(1), dx.size(2), 1]) > fire_rate
-        stochastic = stochastic.float().to(self.device)
-        dx = dx * stochastic
-
         x = x + dx
 
         post_life_mask = self.alive(F.pad(x, (1, 1, 1, 1), "circular"))
-        life_mask = (pre_life_mask & post_life_mask).float()
+        life_mask = (pre_life_mask & post_life_mask).to(x.dtype)
         x = x * life_mask
         return x
 
-    def forward(self, x, steps=1, fire_rate=None, angle=0.0):
+    def forward(self, x, steps=1):
         seq = [x]
         for step in range(steps):
-            x = self.update(x, fire_rate, angle)
+            x = self.update(x)
             seq.append(x)
         return seq
