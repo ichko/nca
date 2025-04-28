@@ -31,10 +31,10 @@ class RadialCirclesProcessor:
             y = S // 2 + int(np.sin(tau) * r)
             cv2.circle(screen, [x, y], sr, i + 1, thickness=-1)
 
-            x1 = S // 2 + int(np.cos(tau) * sr)
-            y1 = S // 2 + int(np.sin(tau) * sr)
-            x2 = S // 2 + int(np.cos(tau) * r)
-            y2 = S // 2 + int(np.sin(tau) * r)
+            # x1 = S // 2 + int(np.cos(tau) * sr)
+            # y1 = S // 2 + int(np.sin(tau) * sr)
+            # x2 = S // 2 + int(np.cos(tau) * r)
+            # y2 = S // 2 + int(np.sin(tau) * r)
 
             # cv2.line(screen, [x1, y1], [x2, y2], color=i + 1, thickness=2)
             # cv2.circle(screen, [x,  y], sr * 3 - i * 3, i + 1, thickness=-1)

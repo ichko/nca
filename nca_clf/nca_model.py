@@ -8,7 +8,7 @@ import torch.nn.init as init
 # SRC: https://github.com/chenmingxiang110/Growing-Neural-Cellular-Automata/blob/master/lib/CAModel.py
 class NCAModel(nn.Module):
     def __init__(self, channel_n, device, hidden_size=128):
-        super(NCAModel, self).__init__()
+        super().__init__()
 
         self.device = device
         self.channel_n = channel_n
@@ -55,7 +55,7 @@ class NCAModel(nn.Module):
 
         post_life_mask = self.alive(F.pad(x, (1, 1, 1, 1), "circular"))
         life_mask = (pre_life_mask & post_life_mask).to(x.dtype)
-        x = x * life_mask
+        # x = x * life_mask
         return x
 
     def forward(self, x, steps=1):
