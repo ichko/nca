@@ -1,5 +1,7 @@
+import os
 import mediapy as mpy
 import torch
+from datetime import datetime
 
 
 def tonp(t):
@@ -14,3 +16,25 @@ def nca_out_to_vids(out, height=150, columns=16, fps=20):
     return mpy.show_videos(
         rgb_out, height=height, fps=fps, codec="gif", border=True, columns=columns
     )
+
+
+def save_model(model, path):
+    dir, file_name = os.path.split(path)
+    os.makedirs(dir, exist_ok=True)
+
+    now = datetime.now()
+    now = now.strftime("%Y-%m-%d::%H-%M-%S")
+    file_name = file_name.format(now=now)
+
+    with open(os.path.join(dir, file_name), "wb+") as fp:
+        torch.save(model, fp)
+
+
+def load_latest_model(dir):
+    paths = [os.path.abspath(os.path.join(dir, f)) for f in os.listdir(dir)]
+    paths = [p for p in paths if os.path.isfile(p)]
+    paths = sorted(paths, key=os.path.getmtime)
+    latest_file = paths[-1]
+
+    with open(latest_file, "rb") as fp:
+        return torch.load(fp)
