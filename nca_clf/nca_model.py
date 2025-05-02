@@ -64,3 +64,41 @@ class NCAModel(nn.Module):
             x = self.update(x)
             seq.append(x)
         return seq
+
+
+class SimpleNCA(nn.Module):
+    def __init__(self, channs, hid=128) -> None:
+        super().__init__()
+        sobel_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]) / 8
+        sobel_y = torch.tensor([[1, 2, 1], [0, 0, 0], [-1, -2, -1]]) / 8
+        identity = torch.tensor([[0, 0, 0], [0, 1, 0], [0, 0, 0]])
+
+        all_filters = torch.stack((identity, sobel_x, sobel_y))
+        all_filters_batch = all_filters.repeat(channs, 1, 1).unsqueeze(1)
+        all_filters_batch = nn.Parameter(all_filters_batch, requires_grad=False)
+
+        self.channs = channs
+        self.all_filters_batch = all_filters_batch
+        self.rule = nn.Sequential(
+            nn.Conv2d(3 * channs, hid, kernel_size=1),
+            nn.ReLU(),
+            nn.Conv2d(hid, channs, kernel_size=1, bias=False),
+        )
+
+        nn.init.zeros_(self.rule[-1].weight)
+
+    def forward(self, x, steps):
+        seq = [x]
+        for _ in range(steps):
+            delta = F.conv2d(
+                F.pad(x, (1, 1, 1, 1), "circular"),
+                # F.pad(x, (1, 1, 1, 1), "constant", 0),
+                self.all_filters_batch,
+                groups=self.channs,
+            )
+            delta = self.rule(delta)
+            x = x + delta
+            seq.append(x)
+
+        seq = torch.stack(seq)
+        return seq
