@@ -67,6 +67,9 @@ class NCAModel(nn.Module):
 
 
 class SimpleNCA(nn.Module):
+    def alive(self, x):
+        return F.max_pool2d(x[:, :1, :, :], kernel_size=3, stride=1, padding=0) > 0.1
+
     def __init__(self, channs, hid=128) -> None:
         super().__init__()
         sobel_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]) / 8
@@ -90,6 +93,9 @@ class SimpleNCA(nn.Module):
     def forward(self, x, steps):
         seq = [x]
         for _ in range(steps):
+            x_padded = F.pad(x, (1, 1, 1, 1), "circular")
+            pre_life_mask = self.alive(x_padded)
+
             delta = F.conv2d(
                 F.pad(x, (1, 1, 1, 1), "circular"),
                 # F.pad(x, (1, 1, 1, 1), "constant", 0),
@@ -98,6 +104,11 @@ class SimpleNCA(nn.Module):
             )
             delta = self.rule(delta)
             x = x + delta
+
+            post_life_mask = self.alive(F.pad(x, (1, 1, 1, 1), "circular"))
+            life_mask = (pre_life_mask & post_life_mask).to(x.dtype)
+            x = x * life_mask
+
             seq.append(x)
 
         seq = torch.stack(seq)
