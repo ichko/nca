@@ -97,17 +97,27 @@ class _Sample:
 
 
 class MNISTPatternGenerator:
-    def __init__(self, is_train, channs, bs, pattern):
+    def __init__(self, is_train, channs, bs, pattern, loop_forever=True, shuffle=True):
         self.pattern = pattern
         mnist = MNIST(MNIST_ROOT, download=True, transform=ToTensor(), train=is_train)
-        ds = MappedDataset(
+        self.ds = MappedDataset(
             mnist, lambda item: _to_nca_example(item, channs, self.pattern)
         )
-        dl = DataLoader(ds, batch_size=bs, shuffle=is_train)
-        self.dl = iterate_forever(dl)
+        self.channs = channs
+        dl = DataLoader(self.ds, batch_size=bs, shuffle=shuffle)
+        if loop_forever:
+            self.it = iterate_forever(dl)
+        else:
+            self.it = iter(dl)
+
+    def __len__(self):
+        return len(self.ds)
+
+    def __iter__(self):
+        return self
 
     def __next__(self):
-        return next(self.dl)
+        return next(self.it)
 
 
 class MNISTPatternPool:
