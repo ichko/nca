@@ -5,6 +5,30 @@ import torch
 from torchvision.datasets.mnist import MNIST
 from torchvision.transforms import ToTensor
 from torch.utils.data import Dataset, DataLoader
+import mediapy as mpy
+
+MNIST_ROOT = "~/.cache"
+
+
+def visualize_mnist_classes():
+    mnist = MNIST(MNIST_ROOT, download=True, transform=ToTensor(), train=True)
+
+    groups = {}
+    for i in range(200):
+        t, l = mnist[i]
+        groups.setdefault(l, []).append([t[0], i])
+
+    for i in range(10):
+        ims = [im for im, i in groups[i]]
+        idxs = [str(i) for im, i in groups[i]]
+        mpy.show_images(ims, idxs, width=120, cmap="viridis")
+
+
+def generate_canonical_mnist_digits():
+    mnist = MNIST(MNIST_ROOT, download=True, transform=ToTensor(), train=True)
+    canon_ids = [1, 6, 5, 7, 64, 175, 126, 38, 97, 162]
+    ims = [mnist[i][0][0] for i in canon_ids]
+    return torch.stack(ims)
 
 
 class MappedDataset(Dataset):
@@ -42,20 +66,17 @@ def iterate_forever(iterable):
             it = iter(iterable)
 
 
-def _generate_radial_circles_pattern(size, num_classes):
-    pattern = np.zeros((size, size))
+def generate_radial_circles_pattern(size, num_classes, sr=8, r=27):
+    pattern = np.zeros((num_classes, size, size))
     for i, tau in enumerate(np.linspace(0, np.pi * 2, num_classes, endpoint=False)):
-        sr = 8
-        r = 27
         x = size // 2 + int(np.cos(tau) * r)
         y = size // 2 + int(np.sin(tau) * r)
-        cv2.circle(pattern, [x, y], sr, i + 1, thickness=-1)
-
+        cv2.circle(pattern[i], [x, y], sr, 1, thickness=-1)
     return torch.tensor(pattern)
 
 
 def _to_nca_example(ds_item, channs, pattern):
-    H, W = pattern.shape
+    _, H, W = pattern.shape
     assert H == W, "we assume W and H are equal"
     size = H
 
@@ -64,21 +85,21 @@ def _to_nca_example(ds_item, channs, pattern):
     inp = torch.zeros(channs, size, size)
     f = size // 2 - xs // 2
     inp[0, f : f + xs, f : f + xs] = x[0]
-    out = (pattern == y + 1).float()
+    out = (pattern[y]).float()
 
-    return inp, out
+    return {"inp": inp, "out": out, "label": y}
 
 
 @dataclass(frozen=True)
 class _Sample:
-    batch: torch.Tensor
+    batch: dict
     index: torch.tensor
 
 
-class MNISTRadialCirclesGenerator:
-    def __init__(self, is_train, num_classes, channs, size, bs):
-        self.pattern = _generate_radial_circles_pattern(size, num_classes)
-        mnist = MNIST("~/.cache", download=True, transform=ToTensor(), train=is_train)
+class MNISTPatternGenerator:
+    def __init__(self, is_train, channs, bs, pattern):
+        self.pattern = pattern
+        mnist = MNIST(MNIST_ROOT, download=True, transform=ToTensor(), train=is_train)
         ds = MappedDataset(
             mnist, lambda item: _to_nca_example(item, channs, self.pattern)
         )
@@ -89,11 +110,11 @@ class MNISTRadialCirclesGenerator:
         return next(self.dl)
 
 
-class MNISTRadialCirclesPool:
-    def __init__(self, is_train, num_classes, channs, size, pool_size, replacement=0.1):
-        self.pattern = _generate_radial_circles_pattern(size, num_classes)
+class MNISTPatternPool:
+    def __init__(self, is_train, channs, size, pool_size, pattern, replacement):
+        self.pattern = pattern
         self.replacement = replacement
-        mnist = MNIST("~/.cache", download=True, transform=ToTensor(), train=is_train)
+        mnist = MNIST(MNIST_ROOT, download=True, transform=ToTensor(), train=is_train)
         ds = MappedDataset(
             mnist, lambda item: _to_nca_example(item, channs, self.pattern)
         )
@@ -104,28 +125,34 @@ class MNISTRadialCirclesPool:
         self.pools = (
             torch.zeros(pool_size, channs, size, size),
             torch.zeros(pool_size, size, size),
+            torch.zeros(pool_size, dtype=torch.int64),
         )
 
         for i in range(pool_size):
-            inp, out = next(self.gen)
-            inps, outs = self.pools
-            inps[i] = inp
-            outs[i] = out
+            batch = next(self.gen)
+            inps, outs, labels = self.pools
+            inps[i] = batch["inp"]
+            outs[i] = batch["out"]
+            labels[i] = batch["label"]
 
     def sample(self, bs):
-        inps, outs = self.pools
+        inps, outs, labels = self.pools
         index = np.random.choice(len(inps), bs)
-        return _Sample(batch=[inps[index], outs[index]], index=index)
+        return _Sample(
+            batch={"inp": inps[index], "out": outs[index], "label": labels[index]},
+            index=index,
+        )
 
     def update(self, sample: _Sample, out_preds, losses):
-        inps, outs = self.pools
+        inps, outs, labels = self.pools
         inps[sample.index] = out_preds.detach().cpu()
 
         replacement_size = int(len(losses) * self.replacement)
-        worst_loss_indices = losses.argsort()[-replacement_size:].cpu()
-        worst_loss_pool_indices = sample.index[worst_loss_indices]
-
+        rand_indices = torch.randint(0, len(losses), size=(replacement_size,))
+        # worst_loss_indices = losses.argsort()[-replacement_size:].cpu()
+        worst_loss_pool_indices = sample.index[rand_indices]
         for index in worst_loss_pool_indices:
-            inp, out = next(self.gen)
-            inps[index] = inp
-            outs[index] = out
+            batch = next(self.gen)
+            inps[index] = batch["inp"]
+            outs[index] = batch["out"]
+            labels[index] = batch["label"]
