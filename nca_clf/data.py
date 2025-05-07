@@ -7,11 +7,11 @@ from torchvision.transforms import ToTensor
 from torch.utils.data import Dataset, DataLoader
 import mediapy as mpy
 
-MNIST_ROOT = "~/.cache"
+DS_ROOT = "~/.cache"
 
 
 def visualize_mnist_classes():
-    mnist = MNIST(MNIST_ROOT, download=True, transform=ToTensor(), train=True)
+    mnist = MNIST(DS_ROOT, download=True, transform=ToTensor(), train=True)
 
     groups = {}
     for i in range(200):
@@ -25,7 +25,7 @@ def visualize_mnist_classes():
 
 
 def generate_canonical_mnist_digits():
-    mnist = MNIST(MNIST_ROOT, download=True, transform=ToTensor(), train=True)
+    mnist = MNIST(DS_ROOT, download=True, transform=ToTensor(), train=True)
     canon_ids = [1, 6, 5, 7, 64, 175, 126, 38, 97, 162]
     ims = [mnist[i][0][0] for i in canon_ids]
     return torch.stack(ims)
@@ -75,17 +75,18 @@ def generate_radial_circles_pattern(size, num_classes, sr=8, r=27):
     return torch.tensor(pattern)
 
 
-def _to_nca_example(ds_item, channs, pattern):
+def _to_nca_example(ds_item, channs, pattern, out_channs=1):
     _, H, W = pattern.shape
     assert H == W, "we assume W and H are equal"
     size = H
 
     x, y = ds_item
+    x_chans = x.shape[0]
     xs = x.shape[-1]
     inp = torch.zeros(channs, size, size)
     f = size // 2 - xs // 2
-    inp[0, f : f + xs, f : f + xs] = x[0]
-    out = (pattern[y]).float()
+    inp[:x_chans, f : f + xs, f : f + xs] = x[:x_chans]
+    out = (pattern[y]).float().repeat(out_channs, 1, 1)
 
     return {"inp": inp, "out": out, "label": y}
 
@@ -97,11 +98,23 @@ class _Sample:
 
 
 class MNISTPatternGenerator:
-    def __init__(self, is_train, channs, bs, pattern, loop_forever=True, shuffle=True):
+    def __init__(
+        self,
+        is_train,
+        channs,
+        bs,
+        pattern,
+        loop_forever=True,
+        shuffle=True,
+        out_channs=1,
+        dataset_cls=MNIST,
+    ):
         self.pattern = pattern
-        mnist = MNIST(MNIST_ROOT, download=True, transform=ToTensor(), train=is_train)
+        mnist = dataset_cls(
+            DS_ROOT, download=True, transform=ToTensor(), train=is_train
+        )
         self.ds = MappedDataset(
-            mnist, lambda item: _to_nca_example(item, channs, self.pattern)
+            mnist, lambda item: _to_nca_example(item, channs, self.pattern, out_channs)
         )
         self.channs = channs
         dl = DataLoader(self.ds, batch_size=bs, shuffle=shuffle)
@@ -121,12 +134,24 @@ class MNISTPatternGenerator:
 
 
 class MNISTPatternPool:
-    def __init__(self, is_train, channs, size, pool_size, pattern, replacement):
+    def __init__(
+        self,
+        is_train,
+        channs,
+        size,
+        pool_size,
+        pattern,
+        replacement,
+        dataset_cls=MNIST,
+        out_channs=1,
+    ):
         self.pattern = pattern
         self.replacement = replacement
-        mnist = MNIST(MNIST_ROOT, download=True, transform=ToTensor(), train=is_train)
+        mnist = dataset_cls(
+            DS_ROOT, download=True, transform=ToTensor(), train=is_train
+        )
         ds = MappedDataset(
-            mnist, lambda item: _to_nca_example(item, channs, self.pattern)
+            mnist, lambda item: _to_nca_example(item, channs, self.pattern, out_channs)
         )
         if is_train:
             ds = ShuffleDataset(ds)
@@ -134,7 +159,7 @@ class MNISTPatternPool:
 
         self.pools = (
             torch.zeros(pool_size, channs, size, size),
-            torch.zeros(pool_size, size, size),
+            torch.zeros(pool_size, out_channs, size, size),
             torch.zeros(pool_size, dtype=torch.int64),
         )
 
