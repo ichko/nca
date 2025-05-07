@@ -14,6 +14,14 @@ def pad_to(pattern, pad_size):
     return screen
 
 
+def nca_clamp(seq, vmin=0, vmax=1):
+    mi, ma = seq.min(), seq.max()
+    seq = (seq - mi) / (ma - mi)
+    seq = tonp(seq)
+    seq = (seq * 255).astype(np.uint8)
+    return seq
+
+
 def nca_cmap(seq, vmin=0, vmax=1, cmap="viridis"):
     # out.shape == [seq, batch, channs, H, W]
     seq = seq.swapaxes(0, 1)
@@ -29,13 +37,16 @@ def tonp(t):
     return t.detach().cpu().numpy()
 
 
-def nca_out_to_vids(out, height=150, columns=16, fps=20):
-    rgb_out = mpy.to_rgb(
-        tonp(out.transpose(0, 1)[:, :, 0]), vmin=0, vmax=1, cmap="viridis"
-    )[:, :, :, :, :3]
+def nca_out_to_vids(out, height=150, columns=16, fps=20, out_channs=1):
+    if out_channs == 1:
+        rgb_out = mpy.to_rgb(
+            tonp(out.transpose(0, 1)[:, :, 0]), vmin=0, vmax=1, cmap="viridis"
+        )[:, :, :, :, :3]
+    else:
+        rgb_out = tonp(out.transpose(0, 1)[:, :, :3]).transpose(0, 1, 3, 4, 2)
 
     return mpy.show_videos(
-        rgb_out, height=height, fps=fps, codec="gif", border=True, columns=columns
+        rgb_out, height=height, fps=fps, codec="gif", columns=columns
     )
 
 
