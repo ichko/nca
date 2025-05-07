@@ -70,7 +70,7 @@ class SimpleNCA(nn.Module):
     def alive(self, x):
         return F.max_pool2d(x[:, :1, :, :], kernel_size=3, stride=1, padding=0) > 0.1
 
-    def __init__(self, channs, hid=128) -> None:
+    def __init__(self, channs, hid=128, alive_mask=True) -> None:
         super().__init__()
         sobel_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]) / 8
         sobel_y = torch.tensor([[1, 2, 1], [0, 0, 0], [-1, -2, -1]]) / 8
@@ -87,6 +87,7 @@ class SimpleNCA(nn.Module):
             nn.ReLU(),
             nn.Conv2d(hid, channs, kernel_size=1, bias=False),
         )
+        self.alive_mask = alive_mask
 
         nn.init.zeros_(self.rule[-1].weight)
 
@@ -107,7 +108,8 @@ class SimpleNCA(nn.Module):
 
             post_life_mask = self.alive(F.pad(x, (1, 1, 1, 1), "circular"))
             life_mask = (pre_life_mask & post_life_mask).to(x.dtype)
-            x = x * life_mask
+            if self.alive_mask:
+                x = x * life_mask
 
             seq.append(x)
 
